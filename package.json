@@ -1,0 +1,37 @@
+{
+  "name": "huaban-download",
+  "version": "0.0.1",
+  "description": "下载花瓣网的图片",
+  "main": "index.js",
+  "scripts": {
+    "start": "node ./dist/index.js",
+    "dev": "nodemon --exec yarn run build --watch src --ext ts",
+    "build": "tsc",
+    "lint": "eslint --ext ts src/ -c .eslintrc.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LasyIsLazy/huaban-download.git"
+  },
+  "keywords": [
+    "huaban"
+  ],
+  "author": "Lasy",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LasyIsLazy/huaban-download/issues"
+  },
+  "homepage": "https://github.com/LasyIsLazy/huaban-download#readme",
+  "peerDependencies": {
+    "axios": "^0.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^12.0.2",
+    "@typescript-eslint/eslint-plugin": "^1.9.0",
+    "@typescript-eslint/parser": "^1.9.0",
+    "axios": "^0.18.0",
+    "eslint": "^5.16.0",
+    "nodemon": "^1.19.0",
+    "typescript": "^3.4.5"
+  }
+}
