@@ -4,7 +4,7 @@
   "description": "下载花瓣网的图片",
   "main": "index.js",
   "scripts": {
-    "start": "node ./dist/index.js",
+    "start": "node ./lib/index.js",
     "dev": "nodemon --exec yarn run build --watch src --ext ts",
     "build": "tsc",
     "lint": "eslint --ext ts src/ -c .eslintrc.js"
