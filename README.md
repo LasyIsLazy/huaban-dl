@@ -4,6 +4,14 @@
 
 ## 安装
 
+依赖于 `axios`，先安装 `axios`：
+
+```shell
+yarn add axios
+# 或者
+npm i axios
+```
+
 ```shell
 yarn add huaban-dl
 # 或者
