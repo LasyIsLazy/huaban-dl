@@ -27,7 +27,7 @@ huaban.getLinks(boardId).then(links => { // boardId 为画板 id
 可以获取更多信息，流程可控。
 
 ```JavaScript
-const huaban = require('huaban-download')
+const huaban = require('huaban-dl')
 const {
   getPageData,
   parsePageData,
