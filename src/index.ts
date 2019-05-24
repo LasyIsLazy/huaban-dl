@@ -1,62 +1,95 @@
 import axios from 'axios'
 const imgBaseUrl = 'https://hbimg.huabanimg.com'
 const boardUrl = 'https://huaban.com/boards/'
-const downloadImglinks: Array<string> = []
-let pageCount: number = 0 // 处理的页数
-function parsePageData(boardId: number, data: string) {
-  let match: RegExpMatchArray | null // 正则匹配结果
+interface ParsedData {
+  boardDataStr: string,
+  title: string,
+  imgKeys: Array<string>,
+  lastPinId: number
+}
 
+/**
+ * 解析返回的页面中的数据
+ * @param boardId 画板 id
+ * @param data 返回的数据
+ */
+function parsePageData(data: string): ParsedData {
+  let match: RegExpMatchArray | null // 正则匹配结果
   // board
   match = data.match(/(?<=page\["board"\]\s*=\s*).+(?=;)/g) // page["board"] = <>;
   if (!match) {
     throw new Error('page["board"] not found')
   }
-  const boardStr: string = match[0]
+  const boardDataStr: string = match[0]
 
   // title
-  match = boardStr.match(/(?<="title":\s*").+?(?=")/g) // "title": "<>"
-  if (!match) {
-    console.warn('title not found')
-  }
-  const title: string = match ? match[0] : ''
+  match = boardDataStr.match(/(?<="title":\s*").+?(?=")/g) // "title": "<>"
+  const title = match ? match[0] : ''
 
   // keys
-  match = boardStr.match(/(?<="file":\{.+"key":").+?(?=",.+\})/g) // "file":{..."key":"<>",...}
-  // 空画板或没有数据了
-  if (!match) {
-    // 没有数据了
-    if (pageCount) {
-      console.log(`处理完成，共获取图片数量 ${downloadImglinks.length}`)
-    } else {
-      console.log('空画板')
-    }
-    return downloadImglinks
-  }
-  const keys: Array<string> = [...match]
-
-  // link
-  downloadImglinks.push(...keys.map(key => `${imgBaseUrl}/${key}`))
-
-  console.log(`第 ${++pageCount} 页处理完成，该页图片链接数量 ${match.length}`)
+  match = boardDataStr.match(/(?<="file":\{.+"key":").+?(?=",.+\})/g) // "file":{..."key":"<>",...}
+  const imgKeys = match ? [...match] : []
 
   // 该页最后一张图片的 pin_id
-  match = boardStr.match(/(?<="pins":\[.+"pin_id":).+?(?=,.+\])/g) // "pins":[..."pin_id":<>,]
-  if (match) {
-    const lastPinId = +match[match.length - 1]
-    console.log(`最后一张图片的 pin_id 是 ${lastPinId}`)
-    return getLinks(boardId, lastPinId)
+  match = boardDataStr.match(/(?<="pins":\[.+"pin_id":).+?(?=,.+\])/g) // "pins":[..."pin_id":<>,]
+  const lastPinId = match ? +match[match.length - 1] : 0
+
+  const parsedData: ParsedData = {
+    boardDataStr,
+    title,
+    imgKeys,
+    lastPinId
   }
-  // TODO: 没有取到 pin_id
-  return
+  return parsedData
 }
-function getLinks(boardId: number, lastPinId?: number):Promise<any> {
+
+/**
+ * 根据 lastPinId 获取画板一页的数据
+ * @param boardId 画板 id
+ * @param lastPinId 上页最后一张图片的 id
+ */
+function getPageData(boardId: number, lastPinId?: number): Promise<any> {
   const params = lastPinId ? { max: lastPinId } : {}
   return axios.get(`${boardUrl}/${boardId}`, { params })
     .then(res => {
       const { data } = res
-      return parsePageData(boardId, data)
+      return data
     })
 }
+
+/**
+ * 转换图片的 key 为图片的链接
+ * @param keys 图片的 key
+ */
+function convertKeysToLinks(keys: Array<string>) {
+  return keys.map(key => `${imgBaseUrl}/${key}`)
+}
+
+/**
+ * 直接获取画板的所有图片下载链接
+ * @param boardId 画板 id
+ */
+async function getLinks(boardId: number) {
+  const keys: Array<string> = []
+  const getAllData = async (lastPinId?: number) => {
+    const pageData = await getPageData(boardId, lastPinId)
+    const parsedData = await parsePageData(pageData)
+    let {
+      imgKeys,
+      lastPinId: pinId
+    } = parsedData
+    if (imgKeys.length) {
+      keys.push(...imgKeys)
+      getAllData(pinId)
+    }
+  }
+  await getAllData()
+  return convertKeysToLinks(keys)
+}
+
 export {
+  getPageData,
+  parsePageData,
+  convertKeysToLinks,
   getLinks
 }
