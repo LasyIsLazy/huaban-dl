@@ -16,22 +16,22 @@ interface ParsedData {
 function parsePageData(data: string): ParsedData {
   let match: RegExpMatchArray | null // 正则匹配结果
   // board
-  match = data.match(/(?<=page\["board"\]\s*=\s*).+(?=;)/g) // page["board"] = <>;
+  match = data.match(/page\["board"\]\s*=\s*(.+)(?=;)/g) // page["board"] = <>;
   if (!match) {
     throw new Error('page["board"] not found')
   }
-  const boardDataStr: string = match[0]
+  const boardDataStr: string = match[1]
 
   // title
-  match = boardDataStr.match(/(?<="title":\s*").+?(?=")/g) // "title": "<>"
-  const title = match ? match[0] : ''
+  match = boardDataStr.match(/"title":\s*"(.+?)(?=")/g) // "title": "<>"
+  const title = match ? match[1] : ''
 
   // keys
-  match = boardDataStr.match(/(?<="file":\{.+"key":").+?(?=",.+\})/g) // "file":{..."key":"<>",...}
+  match = boardDataStr.match(/"file":\{.+"key":"(.+?)(?=",.+\})/g) // "file":{..."key":"<>",...}
   const imgKeys = match ? [...match] : []
 
   // 该页最后一张图片的 pin_id
-  match = boardDataStr.match(/(?<="pins":\[.+"pin_id":).+?(?=,.+\])/g) // "pins":[..."pin_id":<>,]
+  match = boardDataStr.match(/"pins":\[.+"pin_id":(.+?)(?=,.+\])/g) // "pins":[..."pin_id":<>,]
   const lastPinId = match ? +match[match.length - 1] : 0
 
   const parsedData: ParsedData = {
