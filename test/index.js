@@ -1,69 +1,63 @@
-const huaban = require('../lib')
+/**
+ * 按页数逐步获取图片信息
+ */
+
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
-const {
-  getPageData,
-  parsePageData,
-  convertKeysToLinks,
-} = huaban
+const Board = require('../lib')
 
-async function getAllInfo(boardId, pageCount = 0, keys = [], pinId = 0) {
-
-  // pageData 是请求到的整个页面的内容，可以自己去匹配需要的信息
-  const pageData = await getPageData(boardId, pinId)
-  // console.log(`页面数据：${pageData}`)
-
-  // parsedData 是从页面内容里解析出来的数据
-  const parsedData = await parsePageData(pageData)
-  const {
-    title, // 画板标题
-    keys: imgKeys, // 该页所有图片的 key，主要用于转换为图片链接
-    lastPinId // 该页最后一张图片的 pin_id，用于获取下一页
-  } = parsedData
-
-  // 完成
-  if (!imgKeys.length) {
-    console.log(`获取完毕，共 ${pageCount} 页图片`)
-    console.log(`图片数量: ${keys.length}`)
-    const links = convertKeysToLinks(keys) // `convertKeysToLinks()` 将图片的 `key` 转换为图片链接
-    return {
-      boardId,
-      pageCount,
-      keys,
-      links,
-      title,
-      length: keys.length
-    }
-  }
-
-  // 保存数据
-  console.log(`从第 ${++pageCount} 页解析的数据：\n
-    画板标题：${title}\n
-    该页图片数量：${imgKeys.length}\n
-    最后一张图片的 pinId：${lastPinId}\n
-    `)
-  keys.push(...imgKeys)
+async function download(boardId) {
+  const board = new Board(boardId)
+  console.log('初始化中……')
+  const { links: firstPageLinks } = await board.init()
+  console.log('初始化完成')
+  console.log(`第 ${board.page} 页图片数量：${firstPageLinks.length}，该页所有链接：`)
+  console.log(`${firstPageLinks.join('\n')}`)
 
   // 获取下一页数据
-  return getAllInfo(boardId, pageCount, keys, lastPinId)
-}
-async function download(boardId) {
-  console.log('Getting info...')
-  const info = await getAllInfo(boardId)
-  const { links } = info
-  console.log('Downloading...')
+  const next = async () => {
+    const data = await board.getNextPage()
+
+    // 结束
+    if (!data) {
+      return
+    }
+
+    const { links } = data
+    console.log(`第 ${board.page} 页图片数量：${links.length}，该页所有链接：`)
+    console.log(`${links.join('\n')}`)
+
+    // 递归
+    await next()
+  }
+
+  // 递归获取下一页数据
+  await next()
+
+  console.log(`共有图片 ${board.page} 页，${board.amount} 张`)
+
+  // 下载
+  const { links } = board
   for (let index = 0; index < links.length; index++) {
     const link = links[index];
-    console.log(`Downloading link: ${link}`)
+    console.log(`下载图片: ${link}`)
     const { data } = await axios({
       method: 'GET',
       url: link,
       responseType: 'arraybuffer'
     })
-    fs.writeFile(path.join(__dirname, '../download', `img${index}.jpeg`), data, err => { err && console.log(err) })
+    const directory = path.join(__dirname, '../download')
+    fs.exists(directory, isExists => {
+      if (!isExists) {
+        console.log(`创建文件夹：${directory}`)
+        fs.mkdir(directory, err => console.warn)
+      }
+      const imgPath = `${directory}/img${index}.jpeg`
+      console.log(`写入路径：${imgPath}`)
+      fs.writeFile(imgPath, data, err => { err && console.log(err) })
+    })
   }
-  console.log(`Download finished, total: ${links.length}`)
   return
 }
 
