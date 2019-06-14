@@ -2,9 +2,8 @@ import axios from 'axios'
 const imgBaseUrl = 'https://hbimg.huabanimg.com'
 const boardUrl = 'https://huaban.com/boards/'
 interface ParsedData {
-  boardDataStr: string,
   title: string,
-  imgKeys: Array<string>,
+  keys: Array<string>,
   lastPinId: number
 }
 
@@ -13,31 +12,20 @@ interface ParsedData {
  * @param boardId 画板 id
  * @param data 返回的数据
  */
-function parsePageData(data: string): ParsedData {
-  let match: RegExpMatchArray | null // 正则匹配结果
-  // board
-  match = data.match(/page\["board"\]\s*=\s*(.+)(?=;)/g) // page["board"] = <>;
-  if (!match) {
-    throw new Error('page["board"] not found')
-  }
-  const boardDataStr: string = match[1]
+function parsePageData(data: any): ParsedData {
 
-  // title
-  match = boardDataStr.match(/"title":\s*"(.+?)(?=")/g) // "title": "<>"
-  const title = match ? match[1] : ''
+  // 标题、pins
+  const { title, pins } = data
 
   // keys
-  match = boardDataStr.match(/"file":\{.+"key":"(.+?)(?=",.+\})/g) // "file":{..."key":"<>",...}
-  const imgKeys = match ? [...match] : []
+  const keys: Array<string> = pins.map((pin: any) => pin.file.key)
 
   // 该页最后一张图片的 pin_id
-  match = boardDataStr.match(/"pins":\[.+"pin_id":(.+?)(?=,.+\])/g) // "pins":[..."pin_id":<>,]
-  const lastPinId = match ? +match[match.length - 1] : 0
+  const lastPinId: number = pins.length ? pins[pins.length - 1].pin_id : 0
 
   const parsedData: ParsedData = {
-    boardDataStr,
     title,
-    imgKeys,
+    keys,
     lastPinId
   }
   return parsedData
@@ -48,12 +36,26 @@ function parsePageData(data: string): ParsedData {
  * @param boardId 画板 id
  * @param lastPinId 上页最后一张图片的 id
  */
-function getPageData(boardId: number, lastPinId?: number): Promise<any> {
+function getPageData(boardId: number, lastPinId?: number): Promise<object> {
   const params = lastPinId ? { max: lastPinId } : {}
-  return axios.get(`${boardUrl}/${boardId}`, { params })
+  const url = `${boardUrl}/${boardId}`
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+  return axios({
+    method: 'GET',
+    url,
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    },
+    params
+  })
     .then(res => {
-      const { data } = res
-      return data
+      const { data, headers } = res
+
+      // application/json
+      if (!/.*application\/json.*/.test(headers['content-type'])) {
+        throw new Error('Response "content-type" is not "application/json"')
+      }
+      return data.board
     })
 }
 
@@ -70,21 +72,21 @@ function convertKeysToLinks(keys: Array<string>) {
  * @param boardId 画板 id
  */
 async function getLinks(boardId: number) {
-  const keys: Array<string> = []
+  const imgKeys: Array<string> = []
   const getAllData = async (lastPinId?: number) => {
     const pageData = await getPageData(boardId, lastPinId)
     const parsedData = await parsePageData(pageData)
     let {
-      imgKeys,
+      keys,
       lastPinId: pinId
     } = parsedData
-    if (imgKeys.length) {
-      keys.push(...imgKeys)
+    if (keys.length) {
+      imgKeys.push(...keys)
       getAllData(pinId)
     }
   }
   await getAllData()
-  return convertKeysToLinks(keys)
+  return convertKeysToLinks(imgKeys)
 }
 
 export {
