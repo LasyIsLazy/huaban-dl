@@ -1,6 +1,6 @@
 {
   "name": "huaban-dl",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "下载花瓣网的图片",
   "main": "index.js",
   "scripts": {
