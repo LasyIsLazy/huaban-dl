@@ -25,9 +25,23 @@ npm i huaban-dl
 直接获取画板所有图片的下载链接
 
 ```JavaScript
-huaban.getLinks(boardId).then(links => { // boardId 为画板 id
-    console.log(links)
-})
+const boardId = 35237897
+const Board = require('huaban-dl')
+
+async function download(boardId) {
+  const board = new Board(boardId)
+  console.log('初始化中……')
+  await board.init()
+  console.log('正在获取所有图片信息……')
+  await board.getAll()
+  const { amount, page, links } = board
+
+  console.log(`共有图片页数： ${page}`)
+  console.log(`共有图片数量： ${amount}`)
+  console.log(`所有图片链接： \n${links.join('\n')}`)
+}
+
+download(boardId)
 ```
 
 ### 操作整个流程
@@ -35,56 +49,69 @@ huaban.getLinks(boardId).then(links => { // boardId 为画板 id
 可以获取更多信息，流程可控。
 
 ```JavaScript
-const huaban = require('huaban-dl')
-const {
-  getPageData,
-  parsePageData,
-  convertKeysToLinks,
-  getLinks
-} = huaban
-const boardId = 35237897 // 画板 id
+/**
+ * 按页数逐步获取图片信息
+ */
 
-async function getAllInfo(boardId, pageCount = 0, keys = [], pinId = 0) {
+const axios = require('axios')
+const fs = require('fs')
+const path = require('path')
+const Board = require('huaban-dl')
 
-  // pageData 是请求到的整个页面的内容，可以自己去匹配需要的信息
-  const pageData = await getPageData(boardId, pinId)
-  // console.log(`页面数据：${pageData}`)
-
-  // parsedData 是从页面内容里解析出来的数据
-  const parsedData = await parsePageData(pageData)
-  const {
-    boardDataStr, // `boardDataStr` 是匹配到画板相关的内容，可以自己去匹配需要的信息
-    title, // 画板标题
-    imgKeys, // 该页所有图片的 key，主要用于转换为图片链接
-    lastPinId // 该页最后一张图片的 pin_id，用于获取下一页
-  } = parsedData
-
-  // 完成
-  if (!imgKeys.length) {
-    console.log(`获取完毕，共 ${keys.length} 页图片`)
-    const links = convertKeysToLinks(keys) // `convertKeysToLinks()` 将图片的 `key` 转换为图片链接
-    return {
-      boardId,
-      pageCount,
-      keys,
-      links,
-      title,
-      length: keys.length
-    }
-  }
-
-  // 保存数据
-  console.log(`从第 ${++pageCount} 页解析的数据：\n
-    画板标题：${title}\n
-    该页所有图片的 key：${imgKeys}\n
-    最后一张图片的 pinId：${lastPinId}\n
-    `)
-  keys.push(...imgKeys)
+async function download(boardId) {
+  const board = new Board(boardId)
+  console.log('初始化中……')
+  const { links: firstPageLinks } = await board.init()
+  console.log('初始化完成')
+  console.log(`第 ${board.page} 页图片数量：${firstPageLinks.length}，该页所有链接：`)
+  console.log(`${firstPageLinks.join('\n')}`)
 
   // 获取下一页数据
-  return getAllInfo(boardId, pageCount, keys, lastPinId)
+  const next = async () => {
+    const data = await board.getNextPage()
+
+    // 结束
+    if (!data) {
+      return
+    }
+
+    const { links } = data
+    console.log(`第 ${board.page} 页图片数量：${links.length}，该页所有链接：`)
+    console.log(`${links.join('\n')}`)
+
+    // 递归
+    await next()
+  }
+
+  // 递归获取下一页数据
+  await next()
+
+  console.log(`共有图片 ${board.page} 页，${board.amount} 张`)
+
+  // 下载
+  const { links } = board
+  for (let index = 0; index < links.length; index++) {
+    const link = links[index];
+    console.log(`下载图片: ${link}`)
+    const { data } = await axios({
+      method: 'GET',
+      url: link,
+      responseType: 'arraybuffer'
+    })
+    const directory = path.join(__dirname, '../download')
+    fs.exists(directory, isExists => {
+      if (!isExists) {
+        console.log(`创建文件夹：${directory}`)
+        fs.mkdir(directory, err => console.warn)
+      }
+      const imgPath = `${directory}/img${index}.jpeg`
+      console.log(`写入路径：${imgPath}`)
+      fs.writeFile(imgPath, data, err => { err && console.log(err) })
+    })
+  }
+  return
 }
-getAllInfo(boardId).then(info => {
-  // console.log(`所有信息：${info}`)
-})
+
+const boardId = 35237897
+download(boardId)
 ```
