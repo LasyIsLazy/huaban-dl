@@ -12,6 +12,7 @@ async function download(boardId) {
   console.log('初始化中……')
   const { links: firstPageLinks } = await board.init()
   console.log('初始化完成')
+  console.log(`画板数据：${JSON.stringify(board.originData)}`)
   console.log(`第 ${board.page} 页图片数量：${firstPageLinks.length}，该页所有链接：`)
   console.log(`${firstPageLinks.join('\n')}`)
 

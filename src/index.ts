@@ -9,18 +9,18 @@ const FINISHED = 3
 const NO_PIN_ID = 0
 
 interface Page {
-  title: string,
-  keys: string[],
-  links: string[],
+  title: string
+  keys: string[]
+  links: string[]
   lastPinId: number
 }
 
 /**
- * 根据 lastPinId 获取画板一页的数据
+ * 根据 lastPinId 获取画板和一页的数据
  * @param boardId 画板 id
  * @param lastPinId 上页最后一张图片的 id
  */
-function getBoardData(boardId: number, lastPinId?: number): Promise<object> {
+function getData(boardId: number, lastPinId?: number): Promise<object> {
   const params = lastPinId ? { max: lastPinId } : {}
   const url = `${boardUrl}/${boardId}`
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
@@ -31,16 +31,15 @@ function getBoardData(boardId: number, lastPinId?: number): Promise<object> {
       'X-Requested-With': 'XMLHttpRequest'
     },
     params
-  })
-    .then(res => {
-      const { data, headers } = res
+  }).then(res => {
+    const { data, headers } = res
 
-      // application/json
-      if (!/.*application\/json.*/.test(headers['content-type'])) {
-        throw new Error('Response "content-type" is not "application/json"')
-      }
-      return data.board
-    })
+    // application/json
+    if (!/.*application\/json.*/.test(headers['content-type'])) {
+      throw new Error('Response "content-type" is not "application/json"')
+    }
+    return data.board
+  })
 }
 
 /**
@@ -51,7 +50,6 @@ function convertKeysToLinks(keys: Array<string>) {
   return keys.map(key => `${imgBaseUrl}/${key}`)
 }
 
-
 export = class Board {
   id: number
   title: string
@@ -59,10 +57,12 @@ export = class Board {
   links: string[]
   page: number
   amount: number
+  /** 原始数据 */
+  originData: object
   protected status: number
   private lastPinId: number
   /**
-   * 构造函数 
+   * 构造函数
    * @param id 画板 id
    */
 
@@ -75,6 +75,7 @@ export = class Board {
     this.page = 0
     this.amount = 0
     this.status = NOT_INITED
+    this.originData = {}
     Object.defineProperty(this, 'amount', {
       get() {
         return this.keys.length
@@ -89,8 +90,7 @@ export = class Board {
    * 解析数据
    * @param data 数据
    */
-  private parseBoardData(data: any): Page {
-
+  private parsePageData(data: any): Page {
     // 标题、pins
     const { title, pins } = data
 
@@ -118,7 +118,9 @@ export = class Board {
     const links = convertKeysToLinks(keys)
 
     // 该页最后一张图片的 pin_id
-    const lastPinId: number = pin_ids.length ? pin_ids[pin_ids.length - 1] : NO_PIN_ID
+    const lastPinId: number = pin_ids.length
+      ? pin_ids[pin_ids.length - 1]
+      : NO_PIN_ID
 
     this.title = title
     this.keys.push(...keys)
@@ -129,14 +131,15 @@ export = class Board {
   }
 
   /**
-   * 初始化
+   * 初始化（初始化的时候会获取第一页的数据并保存）
    */
-  async init(): Promise<Page> {
-    const boardData = await getBoardData(this.id)
-    const pageData = this.parseBoardData(boardData)
+  async init(): Promise<Board> {
+    const data = await getData(this.id)
+    await this.parsePageData(data)
     this.page = 1
     this.status = INITED
-    return pageData
+    this.originData = data
+    return this
   }
 
   /**
@@ -147,8 +150,8 @@ export = class Board {
       console.warn('Has not been inited')
       return
     }
-    const boardData = await getBoardData(this.id, this.lastPinId)
-    const pageData = this.parseBoardData(boardData)
+    const data = await getData(this.id, this.lastPinId)
+    const pageData = this.parsePageData(data)
     if (this.status === FINISHED) {
       return
     }
@@ -162,16 +165,15 @@ export = class Board {
    */
   async getAll() {
     // 初始化
-    !this.status && await this.init()
+    !this.status && (await this.init())
 
     // 下一次递归
     const next = async () => {
-      
       // 完成
       if (this.status === FINISHED) {
         return
       }
-      
+
       // 页数溢出
       if (this.page >= MAX_PAGE) {
         throw new Error(`Overflow: Max page: ${MAX_PAGE}`)

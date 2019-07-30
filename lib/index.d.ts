@@ -12,17 +12,19 @@ declare const _default: {
         links: string[];
         page: number;
         amount: number;
+        /** 原始数据 */
+        originData: object;
         status: number;
         lastPinId: number;
         /**
          * 解析数据
          * @param data 数据
          */
-        parseBoardData(data: any): Page;
+        parsePageData(data: any): Page;
         /**
-         * 初始化
+         * 初始化（初始化的时候会获取第一页的数据并保存）
          */
-        init(): Promise<Page>;
+        init(): Promise<any>;
         /**
          * 获取下一页图片信息
          */
