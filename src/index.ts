@@ -62,7 +62,7 @@ interface PageData {
 export async function getPageData(
   boardId: number,
   lastPinId?: number
-): Promise<object> {
+): Promise<PageData> {
   const params = lastPinId ? { max: lastPinId } : {}
   const url = `${boardUrl}/${boardId}`
 
